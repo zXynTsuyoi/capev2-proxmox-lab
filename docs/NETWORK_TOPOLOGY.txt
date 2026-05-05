@@ -1,0 +1,104 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      CAPEv2 Sandbox — Network Topology                        ║
+║                    Deployed 2026-05-05 · Ubuntu 22.04 LTS                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+                              INTERNET / LAB NETWORK
+                                      │
+                                      │ 10.11.60.0/24
+                                      │
+                                 ┌────┴────┐
+                                 │  Proxmox  │
+                                 │  VM #115  │
+                                 └────┬────┘
+                                      │
+                         ┌────────────┴────────────┐
+                         │    Ubuntu 22.04.5 LTS    │
+                         │    Host: cape-vm          │
+                         │                          │
+                         │  ens18: <HOST_IP>     │◄── management access
+                         │                          │
+                         │  ┌────────────────────┐  │
+                         │  │  CAPE Web UI       │  │
+                         │  │  127.0.0.1:8000    │  │◄── SSH tunnel required
+                         │  │  (localhost only)  │  │    for remote access
+                         │  └────────────────────┘  │
+                         │                          │
+                         │  ┌────────────────────┐  │
+                         │  │  PostgreSQL 14      │  │
+                         │  │  127.0.0.1:5432    │  │
+                         │  │  DB: cape          │  │
+                         │  └────────────────────┘  │
+                         │                          │
+                         │  ┌────────────────────┐  │
+                         │  │  MongoDB 8.0       │  │
+                         │  │  127.0.0.1:27017   │  │
+                         │  │  Reporting store   │  │
+                         │  └────────────────────┘  │
+                         │                          │
+                         │     ┌───────────────┐    │
+                         │     │   virbr1       │    │
+                         │     │ 192.168.100.1  │    │
+                         │     │  /24            │    │
+                         │     │  ISOLATED      │    │
+                         │     │  NO INTERNET   │    │
+                         │     └───┬───────────┘    │
+                         │         │                 │
+                         │         │ virbr1 bridge   │
+                         │         │                 │
+                         │  ┌──────┴─────────────┐  │
+                         │  │  Windows 10 VM      │  │
+                         │  │  Name: win10        │  │
+                         │  │  IP: 192.168.100.100│  │
+                         │  │  RAM: 4096 MB       │  │
+                         │  │  vCPUs: 2           │  │
+                         │  │  Disk: 40 GB qcow2  │  │
+                         │  │                     │  │
+                         │  │  CAPE Agent :8000   │  │
+                         │  │  User: cape/cape    │  │
+                         │  │  Auto-login: yes    │  │
+                         │  │  Snapshot: snapshot1│  │
+                         │  └────────────────────┘  │
+                         │                          │
+                         │  CAPE Analysis Flow:      │
+                         │  1. Submit sample → Web   │
+                         │  2. CAPE reverts VM       │
+                         │     to snapshot1           │
+                         │  3. CAPE starts win10     │
+                         │  4. Agent connects :8000  │
+                         │  5. CAPE uploads payload  │
+                         │  6. CAPE detonates sample │
+                         │  7. Agent returns logs    │
+                         │  8. CAPE processes report │
+                         │  9. VM reverted, shut off │
+                         │                          │
+                         └──────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  Service Map                                                                 ║
+╠══════════════════════╤══════════════════╤════════════════════════════════════╣
+║  Service             │ User             │ Port / Path                       ║
+╠══════════════════════╪══════════════════╪════════════════════════════════════╣
+║  cape (scheduler)    │ cape             │ manages analysis queue            ║
+║  cape-processor      │ cape             │ processes completed analyses      ║
+║  cape-rooter         │ root             │ iptables routing, port 2042       ║
+║  cape-web (Django)   │ cape             │ 127.0.0.1:8000                   ║
+║  mongodb             │ mongodb          │ 127.0.0.1:27017                  ║
+║  postgresql          │ postgres         │ 127.0.0.1:5432                   ║
+║  QEMU win10          │ libvirt-qemu     │ VNC :5901                        ║
+║  CAPE Agent (win10)  │ SYSTEM           │ 192.168.100.100:8000             ║
+╚══════════════════════╧══════════════════╧════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  Access Guide                                                                ║
+╠════════════════════════╤═════════════════════════════════════════════════════╣
+║  Resource              │ How to Reach                                        ║
+╠════════════════════════╪═════════════════════════════════════════════════════╣
+║  CAPE Web UI (remote) │ ssh -L 8000:127.0.0.1:8000 cape@<HOST_IP>      ║
+║                        │ → http://localhost:8000  login: cape/cape123       ║
+║  Windows VM VNC        │ ssh -L 5901:127.0.0.1:5901 cape@<HOST_IP>      ║
+║                        │ → vnc://localhost:5901  password: capelab          ║
+║  SSH to host           │ ssh cape@<HOST_IP>                              ║
+║  Agent check (host)    │ curl http://192.168.100.100:8000/                  ║
+║  Submit sample (host)  │ cape submit /path/to/file                          ║
+╚════════════════════════╧═════════════════════════════════════════════════════╝
